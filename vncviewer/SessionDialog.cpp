@@ -285,6 +285,7 @@ BOOL CALLBACK SessDlgProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			EndDialog(hwnd, FALSE);
 			return TRUE;
 		case IDC_SHOWOPTIONS:
+		case IDC_SHOWOPTIONSICON:
 		case IDC_BUTTON_EXPAND:
 			_this->ExpandBox(hwnd, !_this->m_bExpanded);
 			if (_this->m_bExpanded)
@@ -444,14 +445,22 @@ void SessionDialog::ExpandBox(HWND hDlg, BOOL fExpand)
 	wndDefaultBox = GetDlgItem(hDlg, IDC_DEFAULTBOX);
 	if (wndDefaultBox == NULL) return;
 
-	// Change button image and text label
+	// Change button image and text label IDC_STATIC7 
 	if (!fExpand) {
-		SendMessage(GetDlgItem(hDlg, IDC_BUTTON_EXPAND), BM_SETIMAGE, (WPARAM)IMAGE_BITMAP, (LPARAM)hBmpExpand);
-		SetWindowText(pCtrl, sz_ShowOptions);
+		//SendMessage(GetDlgItem(hDlg, IDC_BUTTON_EXPAND), BM_SETIMAGE, (WPARAM)IMAGE_BITMAP, (LPARAM)hBmpExpand);
+		SendDlgItemMessage(hDlg, IDC_BUTTON_EXPAND, BM_SETIMAGE, IMAGE_BITMAP, (LPARAM)hBmpExpand);
+		SetDlgItemText(hDlg, IDC_BUTTON_EXPAND, sz_ShowOptions);
+		SendDlgItemMessage(hDlg, IDC_SHOWOPTIONSICON, STM_SETIMAGE, IMAGE_BITMAP, (LPARAM)hBmpExpand);
+		SetDlgItemText(hDlg, IDC_SHOWOPTIONS, sz_ShowOptions);
+		//SetWindowText(pCtrl, sz_ShowOptions);
 	}
 	else {
-		SendMessage(GetDlgItem(hDlg, IDC_BUTTON_EXPAND), BM_SETIMAGE, (WPARAM)IMAGE_BITMAP, (LPARAM)hBmpCollaps);
-		SetWindowText(pCtrl, sz_HideOptions);
+		//SendMessage(GetDlgItem(hDlg, IDC_BUTTON_EXPAND), BM_SETIMAGE, (WPARAM)IMAGE_BITMAP, (LPARAM)hBmpCollaps);
+		SendDlgItemMessage(hDlg, IDC_BUTTON_EXPAND, BM_SETIMAGE, IMAGE_BITMAP, (LPARAM)hBmpCollaps);
+		SetDlgItemText(hDlg, IDC_BUTTON_EXPAND, sz_HideOptions);
+		SendDlgItemMessage(hDlg, IDC_SHOWOPTIONSICON, STM_SETIMAGE, IMAGE_BITMAP, (LPARAM)hBmpCollaps);
+		SetDlgItemText(hDlg, IDC_SHOWOPTIONS, sz_HideOptions);
+		//SetWindowText(pCtrl, sz_HideOptions);
 	}
 
 	// retrieve coordinates for the default child window
@@ -496,32 +505,37 @@ void SessionDialog::ExpandBox(HWND hDlg, BOOL fExpand)
 	{
 		_ASSERT(!m_bExpanded);
 
-		// Position bottom left button 
-		HWND hBottomLeftButton = GetDlgItem(hDlg, IDC_SAVE);
+		// Get position of bottom right "save" button 
+		HWND hBottomRightButton = GetDlgItem(hDlg, IDC_SAVE);
 		RECT rcDelete;
-		GetWindowRect(hBottomLeftButton, &rcDelete);
-		POINT ptBottomRight = { rcDelete.right, rcDelete.bottom };
-		ScreenToClient(hDlg, &ptBottomRight);
-		int paddingX = MulDiv(16, m_Dpi, 96);
-		int paddingY = MulDiv(16, m_Dpi, 96);
-		int desiredWidth = ptBottomRight.x + paddingX;
-		int desiredHeight = ptBottomRight.y + paddingY;
-		DWORD dwStyle = GetWindowLong(hDlg, GWL_STYLE);
-		DWORD dwExStyle = GetWindowLong(hDlg, GWL_EXSTYLE);
-		RECT rcClient = { 0, 0, desiredWidth, desiredHeight };	
-		if (m_pCC->adjustWindowRectExForDpi)
+		GetWindowRect(hBottomRightButton, &rcDelete); // LeftTop/RightBottom of the "save" button in RECT rcDelete
+		GetWindowRect(hDlg, &rcWnd); //  LT/BR of the Dialog window
+		POINT ptBottomRight = { rcDelete.right, rcDelete.bottom }; //  RightBottom point of "save" button
+		ScreenToClient(hDlg, &ptBottomRight); // Convert it Screen coordinates
+		int paddingX = MulDiv(16, m_Dpi, 96); // padding for X based on DPI
+		int paddingY = MulDiv(16, m_Dpi, 96); // padding for Y based on DPI
+		int desiredWidth = ptBottomRight.x + paddingX; // Desired RightBottom-X + padding
+		int desiredHeight = ptBottomRight.y + paddingY; // Desired RightBottom-Y + padding
+		DWORD dwStyle = GetWindowLong(hDlg, GWL_STYLE); // Window Style
+		DWORD dwExStyle = GetWindowLong(hDlg, GWL_EXSTYLE); // Extended Window Style
+		RECT rcClient = { 0, 0, desiredWidth, desiredHeight };	// Rectangle coordinages for the new target
+		if (m_pCC->adjustWindowRectExForDpi) // Calculates the required size of the window rectangle based on DPI
 		{
 			m_pCC->adjustWindowRectExForDpi(&rcClient, dwStyle, FALSE, dwExStyle,m_Dpi);
 		}
-		else
+		else // Calculates the required size of the window rectangle
 		{
 			AdjustWindowRectEx(&rcClient, dwStyle, FALSE, dwExStyle);
 		}
-
-		SetWindowPos(hDlg, NULL, 0, 0,
-			rcClient.right - rcClient.left,
-			rcClient.bottom - rcClient.top,
-			SWP_NOMOVE | SWP_NOZORDER);
+		// Animate expand. Index step should be multiple of the Window Height
+		for (int index = rcDefaultBox.bottom - rcWnd.top; index <= rcClient.bottom - rcClient.top; index += 52)
+		{
+			SetWindowPos(hDlg, NULL, 0, 0,
+				rcClient.right - rcClient.left,
+				index,
+				SWP_NOMOVE | SWP_NOZORDER);
+			Sleep(1);
+		}
 
 		// make sure that the entire dialog box is visible on the user's
 		// screen.
